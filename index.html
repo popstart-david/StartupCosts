@@ -1,0 +1,1640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Popstart — Startup Costs Estimator</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Lora:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+--navy:#1F3A5F;--teal:#2EA3A6;--amber:#C97B2B;--green:#2E8B57;--red:#C0392B;
+--bg:#F7F8FA;--surface:#FFFFFF;--border:#D1D5DB;--text:#1A1A2E;--text-light:#6B7280;
+--font-display:'Inter',sans-serif;--font-sans:system-ui,-apple-system,sans-serif;--font-mono:'Courier New',monospace;
+--font-serif:'Lora',Georgia,serif;
+}
+body{font-family:var(--font-display);background:var(--bg);color:var(--text);height:100vh;overflow:hidden;display:flex;flex-direction:column}
+
+/* TOPBAR */
+#topbar{background:var(--navy);padding:10px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;flex-shrink:0}
+#topbar .tb-label{color:#9FB3CC;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:3px}
+#topbar select,#topbar input[type=text]{background:#2A4A6E;border:1px solid #3D5E85;color:#fff;border-radius:6px;padding:5px 8px;font-size:13px;font-family:var(--font-display)}
+#topbar select option{background:#1F3A5F}
+#topbar .tb-group{display:flex;flex-direction:column}
+#start-btn{margin-left:auto;background:var(--teal);color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font-display)}
+#start-btn:hover{background:#25898C}
+
+/* MAIN LAYOUT */
+#main{display:flex;flex:1;overflow:hidden}
+#chat-pane{width:420px;min-width:420px;background:var(--surface);display:flex;flex-direction:column;border-right:1px solid var(--border)}
+#canvas-pane{flex:1;display:flex;flex-direction:column;overflow:hidden}
+
+/* CHAT */
+#chat-msgs{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px}
+#chat-input-area{border-top:1px solid var(--border);padding:10px}
+
+.bot-bubble{display:flex;gap:8px;align-items:flex-start}
+.bot-avatar{width:28px;height:28px;border-radius:50%;background:var(--teal);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;margin-top:2px}
+.bot-text{background:#F3F4F6;border-radius:0 12px 12px 12px;padding:10px 13px;font-size:13.5px;line-height:1.55;max-width:340px}
+.bot-text p{margin-bottom:6px}.bot-text p:last-child{margin-bottom:0}
+
+.user-bubble{display:flex;justify-content:flex-end}
+.user-text{background:var(--navy);color:#fff;border-radius:12px 0 12px 12px;padding:10px 13px;font-size:13.5px;line-height:1.55;max-width:320px}
+
+.coach-bubble{background:#FFF8EE;border-left:3px solid var(--amber);border-radius:0 8px 8px 8px;padding:10px 13px;font-size:13px;line-height:1.55;max-width:360px}
+.coach-tag{font-size:10px;font-weight:700;color:var(--amber);letter-spacing:.8px;display:block;margin-bottom:4px}
+.coach-bubble em{font-style:italic;font-family:var(--font-serif)}
+
+.hint-line{font-size:12px;color:var(--text-light);font-style:italic;padding:6px 10px;border-top:1px dashed var(--border);margin-top:4px}
+
+.authored-tag{display:inline-block;font-size:10px;color:var(--text-light);border:1px solid var(--border);border-radius:10px;padding:1px 8px;margin-top:6px;font-family:var(--font-sans)}
+
+/* INPUT CONTROLS */
+.ctrl-wrap{padding:8px 0 4px}
+.ctrl-wrap textarea{width:100%;border:1px solid var(--border);border-radius:8px;padding:8px;font-size:13px;font-family:var(--font-display);resize:vertical;min-height:60px}
+.char-count{font-size:11px;color:var(--text-light);text-align:right;margin-top:2px}
+
+.pill-row{display:flex;flex-wrap:wrap;gap:6px;padding:6px 0}
+.pill-btn{background:#F3F4F6;border:1px solid var(--border);border-radius:20px;padding:6px 14px;font-size:13px;cursor:pointer;font-family:var(--font-display)}
+.pill-btn:hover{background:#E5E7EB;border-color:#9CA3AF}
+.pill-btn.selected{background:var(--navy);color:#fff;border-color:var(--navy)}
+
+.send-btn{background:var(--teal);color:#fff;border:none;border-radius:8px;padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer;margin-top:6px;font-family:var(--font-display)}
+.send-btn:hover{background:#25898C}
+.send-btn:disabled{background:#9CA3AF;cursor:default}
+
+/* DYNLIST */
+.dynlist-wrap{display:flex;flex-direction:column;gap:6px;padding:6px 0}
+.dynlist-row{display:flex;gap:6px;align-items:center}
+.dynlist-num{font-size:12px;color:var(--text-light);width:16px;text-align:right;flex-shrink:0}
+.dynlist-row input[type=text]{flex:1;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12.5px;font-family:var(--font-display)}
+.dynlist-row input[type=number]{width:90px;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12.5px;font-family:var(--font-display)}
+.dynlist-row .remove-btn{background:none;border:none;color:#9CA3AF;cursor:pointer;font-size:16px;line-height:1;padding:2px 4px}
+.dynlist-row .remove-btn:hover{color:var(--red)}
+.add-row-btn{font-size:12px;color:var(--teal);background:none;border:none;cursor:pointer;padding:4px 0;text-align:left}
+.add-row-btn:hover{text-decoration:underline}
+
+/* DROPDOWN STYLED */
+.styled-select{width:100%;border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;font-family:var(--font-display);background:var(--surface)}
+
+/* NUMBER INPUT */
+.number-wrap{display:flex;align-items:center;gap:6px}
+.number-prefix{font-size:14px;color:var(--text-light)}
+.number-wrap input{border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:14px;width:140px;font-family:var(--font-display)}
+
+/* EXAMPLE BTN */
+.example-btn{font-size:11px;color:var(--teal);background:none;border:1px solid var(--teal);border-radius:10px;padding:2px 10px;cursor:pointer;margin-top:4px}
+.example-wrap{font-size:12px;color:var(--text-light);background:#F9FAFB;border-radius:6px;padding:8px 10px;margin-top:6px;line-height:1.5}
+
+/* CANVAS PANE */
+.tab-bar{display:flex;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0}
+.tab-btn{padding:10px 18px;font-size:13px;font-weight:500;border:none;background:none;cursor:pointer;color:var(--text-light);border-bottom:2px solid transparent;font-family:var(--font-display)}
+.tab-btn.active{color:var(--navy);border-bottom-color:var(--teal);font-weight:600}
+.tab-content{display:none;flex:1;overflow-y:auto;padding:16px}
+.tab-content.active{display:block}
+
+/* CARDS (Stages tab) */
+#cards-container{display:flex;flex-direction:column;gap:12px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.card-header{background:#F9FAFB;padding:10px 14px;font-size:12px;font-weight:700;color:var(--navy);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.card-num{width:22px;height:22px;background:var(--navy);color:#fff;border-radius:50%;font-size:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.card-body{padding:12px 14px;font-size:12.5px;color:var(--text-light);font-style:italic}
+.card-body.populated{color:var(--text);font-style:normal}
+.card.flash{animation:cardflash .5s ease}
+@keyframes cardflash{0%{background:#EBF9F1}100%{background:var(--surface)}}
+
+/* DELIVERABLE */
+#deliv-content{font-family:var(--font-serif);font-size:14px;line-height:1.65;color:var(--text)}
+.zone-block{margin-bottom:28px}
+.zone-badge{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;background:var(--navy);color:#fff;border-radius:50%;font-size:11px;font-weight:700;font-family:var(--font-display);margin-right:8px;vertical-align:middle}
+.zone-label{font-size:11px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.8px;font-family:var(--font-display);display:block;margin-bottom:8px}
+.zone-title{font-size:16px;font-weight:500;color:var(--navy);margin-bottom:10px;font-family:var(--font-display)}
+
+/* CHIPS (Zone 1) */
+.chips-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:12px 0}
+.chip{background:#F3F4F6;border-radius:8px;padding:8px 10px}
+.chip-label{font-size:10px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:2px;font-family:var(--font-display)}
+.chip-value{font-size:13px;font-weight:500;color:var(--text);font-family:var(--font-display)}
+.chip.editable{cursor:pointer;border:1px dashed var(--teal)}
+.chip.editable:hover{background:#E1F7F7}
+.chip-edit-input{width:100%;border:none;background:transparent;font-size:13px;font-weight:500;font-family:var(--font-display);outline:1px solid var(--teal);border-radius:4px;padding:2px 4px}
+
+/* CALCULATOR TABLE (Zone 2) */
+.calc-section{margin-bottom:18px}
+.calc-section-title{font-size:12px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;font-family:var(--font-display);padding-bottom:4px;border-bottom:2px solid var(--navy)}
+table.calc-table{width:100%;border-collapse:collapse;font-size:12.5px;font-family:var(--font-display)}
+table.calc-table th{background:#F3F4F6;padding:6px 8px;text-align:left;font-weight:600;font-size:11px;color:var(--text-light);border-bottom:1px solid var(--border)}
+table.calc-table td{padding:6px 8px;border-bottom:1px solid #F3F4F6;vertical-align:top}
+table.calc-table tr.subtotal-row td{background:#F9FAFB;font-weight:700;border-top:1px solid var(--border)}
+table.calc-table tr.total-row td{background:var(--navy);color:#fff;font-weight:700;font-size:13px}
+.status-on-track{color:var(--green);font-weight:600;font-size:11px}
+.status-review{color:var(--amber);font-weight:600;font-size:11px}
+.status-gap{color:var(--red);font-weight:600;font-size:11px}
+.facility-zero-note{font-style:italic;color:var(--text-light);font-size:12px;margin-top:4px}
+.est-suffix{color:var(--text-light);font-size:11px}
+.runway-sentence{font-size:13px;color:var(--text-light);font-style:italic;margin-top:8px;padding:8px;background:#F9FAFB;border-radius:6px;font-family:var(--font-display)}
+.buffer-skipped-note{font-style:italic;color:var(--text-light)}
+
+/* STATUS BADGE (Zone 3) */
+.status-badge{border-radius:10px;padding:16px 20px;margin:8px 0;border:2px solid}
+.status-badge .badge-tier{font-size:20px;font-weight:700;font-family:var(--font-display);letter-spacing:.5px;margin-bottom:6px}
+.status-badge .badge-explanation{font-size:13.5px;line-height:1.55;font-family:var(--font-display)}
+
+/* COACH MOMENT (Zone 4) */
+.coach-moment-block{background:#FFF8EE;border-left:3px solid var(--amber);border-radius:0 8px 8px 8px;padding:12px 14px;margin-bottom:10px}
+.coach-moment-q{font-style:italic;font-size:14px;font-family:var(--font-serif);line-height:1.6;color:var(--text)}
+.coach-moment-src{font-size:11px;color:var(--text-light);margin-top:6px;font-family:var(--font-display)}
+
+/* ZONE 5 */
+.zone5-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:8px}
+.zone5-col-title{font-size:11px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;font-family:var(--font-display)}
+.action-item{display:flex;gap:8px;margin-bottom:8px;font-size:13px;line-height:1.5;font-family:var(--font-display)}
+.action-num{flex-shrink:0;width:20px;height:20px;background:var(--teal);color:#fff;border-radius:50%;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:1px}
+.fwd-bridge{font-size:13px;color:var(--text);line-height:1.5;font-family:var(--font-display);background:#EBF7F7;border-left:3px solid var(--teal);padding:8px 10px;border-radius:0 6px 6px 0;margin-bottom:10px}
+.glossary-block{margin-top:16px;padding-top:12px;border-top:1px solid var(--border)}
+.glossary-title{font-size:11px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;font-family:var(--font-display)}
+.gloss-term{font-size:12.5px;margin-bottom:6px;font-family:var(--font-display)}
+.gloss-term strong{color:var(--navy);font-weight:600}
+
+/* BOUNDARIES */
+.boundaries-block{background:#FFF8EE;border-left:3px solid var(--amber);padding:12px 14px;border-radius:0 8px 8px 8px;margin-top:20px}
+.boundaries-block p{font-size:11.5px;color:var(--text-light);font-style:italic;line-height:1.55;font-family:var(--font-display);margin-bottom:6px}
+.boundaries-block p:last-child{margin-bottom:0}
+
+/* COACH MODE */
+.coach-mode-wrap{padding:12px 0}
+.coach-topics-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
+.coach-topic-btn{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:12.5px;cursor:pointer;text-align:left;font-family:var(--font-display);line-height:1.4;color:var(--text)}
+.coach-topic-btn:hover{background:#F3F4F6;border-color:#9CA3AF}
+.coach-free-wrap{display:flex;gap:8px;margin-top:8px}
+.coach-free-wrap input{flex:1;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;font-family:var(--font-display)}
+.coach-free-wrap button{background:var(--teal);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;font-family:var(--font-display)}
+
+/* REVIEW CHIPS */
+.review-chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.review-chip{background:#F3F4F6;border:1px solid var(--border);border-radius:16px;padding:4px 12px;font-size:12px;font-family:var(--font-display)}
+.review-chip.editable-chip{border:1px dashed var(--teal);cursor:pointer}
+.review-chip.editable-chip:hover{background:#E1F7F7}
+.review-confirm-wrap{display:flex;gap:8px;margin-top:8px}
+.confirm-btn{background:var(--green);color:#fff;border:none;border-radius:8px;padding:7px 16px;font-size:13px;cursor:pointer;font-family:var(--font-display)}
+.edit-btn{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:7px 14px;font-size:13px;cursor:pointer;font-family:var(--font-display)}
+
+/* ANSWERS TAB */
+.answers-list{display:flex;flex-direction:column;gap:8px}
+.answer-item{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px}
+.answer-pid{font-size:10px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px;font-family:var(--font-display)}
+.answer-val{font-size:13px;font-family:var(--font-display);color:var(--text)}
+
+.deliv-flash{animation:delivflash .6s ease}
+@keyframes delivflash{0%{background:#EBF9F1}50%{background:#D1F5E8}100%{background:transparent}}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div id="topbar">
+  <div class="tb-group">
+    <span class="tb-label">Business Stage</span>
+    <select id="tb-stage">
+      <option value="">Select stage…</option>
+      <option value="Just Exploring">Just Exploring</option>
+      <option value="Pre-Launch">Pre-Launch</option>
+      <option value="Early Stage">Early Stage</option>
+      <option value="Growth">Growth</option>
+      <option value="Established">Established</option>
+    </select>
+  </div>
+  <div class="tb-group">
+    <span class="tb-label">Business Type</span>
+    <select id="tb-type">
+      <option value="">Select type…</option>
+      <option value="Service">Service</option>
+      <option value="Product">Product</option>
+      <option value="E-Commerce">E-Commerce</option>
+    </select>
+  </div>
+  <div class="tb-group">
+    <span class="tb-label">Geographic Scope</span>
+    <select id="tb-geo">
+      <option value="">Select scope…</option>
+      <option value="Local">Local</option>
+      <option value="Regional">Regional</option>
+      <option value="National">National</option>
+      <option value="Online">Online</option>
+    </select>
+  </div>
+  <div class="tb-group">
+    <span class="tb-label">Industry</span>
+    <input type="text" id="tb-industry" placeholder="e.g. Nutrition Coaching" style="width:150px">
+  </div>
+  <button id="start-btn" onclick="start()">Start Session ▶</button>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+  <!-- CHAT PANE -->
+  <div id="chat-pane">
+    <div id="chat-msgs"></div>
+    <div id="chat-input-area"></div>
+  </div>
+
+  <!-- CANVAS PANE -->
+  <div id="canvas-pane">
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('answers')">Your Answers</button>
+      <button class="tab-btn" onclick="switchTab('stages')">Stages</button>
+      <button class="tab-btn" onclick="switchTab('deliverable')">Deliverable</button>
+    </div>
+    <div id="tab-answers" class="tab-content active">
+      <div class="answers-list" id="answers-list"><p style="color:var(--text-light);font-size:13px;font-style:italic">Your answers will appear here as you complete each prompt.</p></div>
+    </div>
+    <div id="tab-stages" class="tab-content">
+      <div id="cards-container"></div>
+    </div>
+    <div id="tab-deliverable" class="tab-content">
+      <div id="deliv-content"><p style="color:var(--text-light);font-size:13px;font-style:italic">Your Startup Cost Estimate will appear here after you complete all prompts.</p></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// DATA LAYER
+// ═══════════════════════════════════════════════════════════════
+
+const REDIRECT_STAGES = ["Growth","Established"];
+
+const STAGE_OPENINGS = {
+  "Just Exploring": "Most people who come to this section have a number in their head — and they're not sure if it's too small or too big. Either way, let's replace the guess with something real. We're going to walk through every cost category together. I'll fill in what I know about businesses like yours, and you can adjust anything that doesn't fit. By the time we're done, you'll have a launch number you can actually plan around.",
+  "Pre-Launch": "You're close — and that means the number matters more than ever. Let's make sure your startup estimate covers everything: what it takes to open, what it takes to stay open in the early months, and what you need in reserve so you're not scrambling if something runs long. I'll benchmark every category against what similar businesses actually spend, and you can confirm or adjust each one.",
+  "Early Stage": "You've already launched — which means you have real data we can work with. Let's use this to see how your actual costs compare to what you originally estimated, and calculate where your runway stands today. If there are gaps, we'll find them here.",
+  "Growth": "Looks like you're already in business — so startup costs are mostly in the rearview mirror. If you're planning a new product line, a new location, or a new business unit, this tool can help you estimate those launch costs. Otherwise, the sections ahead are more relevant to where you are now. Want to keep going here, or would you rather jump to a section built for your stage?",
+  "Established": "Looks like you're already in business — so startup costs are mostly in the rearview mirror. If you're planning a new product line, a new location, or a new business unit, this tool can help you estimate those launch costs. Otherwise, the sections ahead are more relevant to where you are now. Want to keep going here, or would you rather jump to a section built for your stage?"
+};
+
+// SCORE benchmark ranges by business type (midpoints for calculation)
+const SCORE = {
+  Service:{
+    equipment:{range:"$500–$2,500",mid:1500},
+    facility:{range:"$0–$3,500",mid:1000},
+    legal:{range:"$500–$2,000",mid:1250},
+    fixed_monthly:{range:"$300–$800/mo",mid:550},
+    variable_pct:0.075,variable_range:"3–10%",
+    revenue_upper:5000
+  },
+  Product:{
+    equipment:{range:"$3,000–$15,000",mid:9000},
+    facility:{range:"$1,000–$5,000",mid:3000},
+    legal:{range:"$500–$2,000",mid:1250},
+    fixed_monthly:{range:"$800–$2,000/mo",mid:1400},
+    variable_pct:0.525,variable_range:"35–70%",
+    revenue_upper:10000
+  },
+  "E-Commerce":{
+    equipment:{range:"$500–$3,000",mid:1750},
+    facility:{range:"$0–$1,000",mid:200},
+    legal:{range:"$500–$2,000",mid:1250},
+    fixed_monthly:{range:"$200–$600/mo",mid:400},
+    variable_pct:0.20,variable_range:"15–30%",
+    revenue_upper:7000
+  }
+};
+
+// Pre-population defaults by business type
+const PREPOP = {
+  P1:{
+    Service:[
+      {item:"Professional certifications",cost:500},
+      {item:"Laptop and software",cost:1200},
+      {item:"Liability insurance deposit",cost:400}
+    ],
+    Product:[
+      {item:"Production equipment",cost:8000},
+      {item:"Initial inventory run",cost:3500},
+      {item:"Packaging design",cost:800}
+    ],
+    "E-Commerce":[
+      {item:"Platform setup fees",cost:300},
+      {item:"Initial inventory",cost:4000},
+      {item:"Product photography",cost:600}
+    ]
+  },
+  P2:{
+    Service:[{item:"Home office setup",cost:500},{item:"Business address/mailbox",cost:200}],
+    Product:[{item:"First and last month rent deposit",cost:3000},{item:"Leasehold improvements",cost:2000}],
+    "E-Commerce":[]
+  },
+  P3:{
+    Service:[{item:"Entity formation (LLC)",cost:500},{item:"Attorney fees for contracts",cost:800},{item:"Accountant setup",cost:400}],
+    Product:[{item:"Entity formation (LLC)",cost:500},{item:"Attorney fees",cost:1000},{item:"Accountant setup",cost:400}],
+    "E-Commerce":[{item:"Entity formation (LLC)",cost:500},{item:"Attorney fees for terms/privacy",cost:600},{item:"Accountant setup",cost:400}]
+  },
+  P4:{
+    Service:[{item:"Software subscriptions",cost:150},{item:"Liability insurance",cost:100},{item:"Phone and internet",cost:120}],
+    Product:[{item:"Storage/warehouse rent",cost:800},{item:"Insurance",cost:200},{item:"Software subscriptions",cost:100}],
+    "E-Commerce":[{item:"Platform fees",cost:100},{item:"Storage/3PL fees",cost:400},{item:"Software subscriptions",cost:80}]
+  }
+};
+
+const PROMPTS = {
+  P1:{
+    key:"P1",label:"One-Time Startup Costs: Equipment & Setup",
+    q:"Take a look at the cost categories that typically apply to your business at launch — based on SCORE industry data. Do any of these need adjusting for your situation? You can change any number, remove anything that doesn't apply, or add something I've missed.",
+    hint:"I've pulled in the cost categories that typically apply to [businessType] businesses at launch. These are based on SCORE industry data.",
+    type:"dynlist",cap:5,min:1,
+    notSure:{moves:["That is completely fine — most people have not had to think through every category before.","Think about what you would physically need on day one.","For a [businessType] business, most founders start with equipment and software as their first line item."],def:"benchmark"}
+  },
+  P2:{
+    key:"P2",label:"One-Time Startup Costs: Facility & Location",
+    q:"Does your business need a physical space, or will you be working from home or online? I've added the facility costs that typically apply to [businessType] businesses in [geoScope] markets — but if you are starting from home or operating fully online, most of these will be zero or near zero. What applies to you?",
+    hint:"Facility costs vary widely depending on whether you need a physical space.",
+    type:"dynlist",cap:3,min:0,
+    notSure:{moves:["No problem — a lot of businesses start without a dedicated space.","Do you picture yourself working from home, renting a space, or flex space?","If starting from home, I can set facility costs to zero for now."],def:"zero"}
+  },
+  P3:{
+    key:"P3",label:"One-Time Startup Costs: Legal & Professional Fees",
+    q:"These are the one-time professional costs most founders pay before they open — things like forming your entity, setting up contracts, or getting your accounting in order. I've pre-filled the typical ranges from SCORE data. Do these feel close to what you are expecting?",
+    hint:"Entity formation, attorney fees, and accountant setup are the three most common categories.",
+    type:"dynlist",cap:3,min:1,
+    notSure:{moves:["This is one of the areas most founders underestimate.","Have you already formed a business entity, or is that still ahead of you?","If you have not formed an entity yet, I would suggest budgeting at least $500 for that step."],def:"benchmark"}
+  },
+  P4:{
+    key:"P4",label:"Ongoing Monthly Costs: Fixed Operating Expenses",
+    q:"Now let's look at what it costs to keep your business running every month — regardless of whether you have any revenue. These are the fixed expenses you will owe no matter what. I've filled in the typical items for your business type based on SCORE industry data. Adjust anything that does not match your situation.",
+    hint:"Fixed costs are what you owe every month whether or not you make a single sale.",
+    type:"dynlist",cap:6,min:1,
+    notSure:{moves:["Monthly costs are where a lot of founders get caught off guard.","Think about the last month you spent money on your business — what showed up that you had to pay regardless of anything else?","Here is what most businesses plan for monthly: software, insurance, phone/internet."],def:"benchmark"}
+  },
+  P5:{
+    key:"P5",label:"Ongoing Monthly Costs: Variable Operating Expenses",
+    q:"These are the costs that go up or down depending on how much business you do — things like supplies, shipping, or sales commissions. I have estimated these as a percentage of your projected monthly revenue based on SCORE benchmarks. You can adjust the percentages or enter specific dollar amounts if you already have quotes.",
+    hint:"Variable costs are estimated from your projected revenue. You can override any amount.",
+    type:"dynlist",cap:5,min:0,
+    notSure:{moves:["Variable costs are tricky to estimate before you have revenue data.","Think about the main thing you sell — what would it cost you to deliver that one thing to one customer?","For your business type, the most common variable cost is your cost of goods or materials."],def:"composite"}
+  },
+  P6:{
+    key:"P6",label:"Projected Monthly Revenue at Launch",
+    q:"What are you expecting to bring in each month when you first open — not your goal, not your ceiling, but the number you think is realistic in your first few months? If you are not sure yet, give me your best guess and we can work with it.",
+    hint:"This is your honest first-months estimate. It feeds your variable cost calculation.",
+    type:"number",
+    notSure:{moves:["There is no wrong answer here — this is your estimate, not a promise.","Think about your first customer or first week. If everything went reasonably well, how much would you bring in that week? Multiply by four.","I can't estimate your revenue for you — that number needs to come from you. Take your best honest guess and we can work with it."],def:null}
+  },
+  P7:{
+    key:"P7",label:"Working Capital: Runway Months",
+    q:"Working capital is the cash you set aside to cover your monthly costs before revenue is reliable. SCORE recommends planning for 3 to 6 months depending on your industry and how quickly your business is likely to ramp up. How many months of operating expenses do you want to have in reserve when you launch?",
+    hint:"SCORE recommends 3–6 months of working capital reserve.",
+    type:"dropdown",options:["3 months","4 months","5 months","6 months","I want to enter a custom number"],
+    notSure:{moves:["The short answer is: the more uncertain your revenue timeline, the more runway you want.","How long do you think it will take before revenue is covering your monthly costs on its own?","Most founders in your situation start with 3 months as a floor."],def:"3 months"}
+  },
+  P8:{
+    key:"P8",label:"Contingency Buffer",
+    q:"A contingency buffer is the amount you add on top of your estimates to account for costs you did not plan for — and there are always some. SVB recommends 15 to 20 percent on top of your estimated total. I have applied 15 percent as a starting point. Do you want to keep that, go higher, or skip it?",
+    hint:"A 15% buffer on a $25,000 estimate adds $3,750 — bringing your launch number to $28,750.",
+    type:"dropdown",options:["Use 15% (standard)","I want to use a higher percentage","I want to skip this"],
+    notSure:{moves:["The contingency buffer protects you from the surprises that always come.","Most founders who skip the buffer end up wishing they had not.","I'd recommend keeping the 15% — it is the SCORE and SVB standard."],def:"Use 15% (standard)"}
+  },
+  P9:{
+    key:"P9",label:"Advanced Cost Detail",
+    q:"Your launch number is calculated. If you want to get more specific — adding line items, adjusting categories, or breaking out costs in more detail — we can do that now. Want to go deeper, or is this estimate solid enough to work with?",
+    hint:"You can proceed with the standard estimate or add more detail.",
+    type:"select",options:["Yes, let's go deeper","No, I'm good with this estimate"],
+    modeSwitch:true,
+    notSure:{moves:[],def:"No, I'm good with this estimate"}
+  }
+};
+
+const PROMPT_KEYS = ["P1","P2","P3","P4","P5","P6","P7","P8"];
+
+// State
+let S = {
+  stage:null,businessType:null,geoScope:null,industry:null,
+  answers:{},chips:{},step:0,plan:[...PROMPT_KEYS],generated:false,
+  p9Answered:false,p9Result:null,bufferSkipped:false,
+  composites:{},notSureCount:{},inEditCycle:false,editCycleDone:false
+};
+
+// ═══════════════════════════════════════════════════════════════
+// CHAT HELPERS
+// ═══════════════════════════════════════════════════════════════
+const msgs = ()=>document.getElementById('chat-msgs');
+const inputArea = ()=>document.getElementById('chat-input-area');
+
+function botSay(html,style='default'){
+  const wrap = document.createElement('div');
+  if(style==='coach'){
+    wrap.className='coach-bubble';
+    wrap.innerHTML=`<span class="coach-tag">COACH MOMENT</span>${html}`;
+  } else {
+    wrap.className='bot-bubble';
+    wrap.innerHTML=`<div class="bot-avatar">P</div><div class="bot-text">${html}</div>`;
+  }
+  msgs().appendChild(wrap);
+  msgs().scrollTop=msgs().scrollHeight;
+  return wrap;
+}
+
+function userSay(text){
+  const wrap=document.createElement('div');
+  wrap.className='user-bubble';
+  wrap.innerHTML=`<div class="user-text">${escHtml(text)}</div>`;
+  msgs().appendChild(wrap);
+  msgs().scrollTop=msgs().scrollHeight;
+}
+
+function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function fmt(n){return Number(n).toLocaleString('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0})}
+
+function clearInput(){document.getElementById('chat-input-area').innerHTML='';}
+
+// ═══════════════════════════════════════════════════════════════
+// START
+// ═══════════════════════════════════════════════════════════════
+function start(){
+  S.stage = document.getElementById('tb-stage').value;
+  S.businessType = document.getElementById('tb-type').value;
+  S.geoScope = document.getElementById('tb-geo').value;
+  S.industry = document.getElementById('tb-industry').value || 'General';
+
+  if(!S.stage||!S.businessType||!S.geoScope){
+    alert('Please select Business Stage, Business Type, and Geographic Scope before starting.');
+    return;
+  }
+
+  document.getElementById('chat-msgs').innerHTML='';
+  document.getElementById('chat-input-area').innerHTML='';
+  document.getElementById('cards-container').innerHTML='';
+  document.getElementById('deliv-content').innerHTML='<p style="color:var(--text-light);font-size:13px;font-style:italic">Your Startup Cost Estimate will appear here after you complete all prompts.</p>';
+  document.getElementById('answers-list').innerHTML='';
+  S={stage:S.stage,businessType:S.businessType,geoScope:S.geoScope,industry:S.industry,
+     answers:{},chips:{},step:0,plan:[...PROMPT_KEYS],generated:false,
+     p9Answered:false,p9Result:null,bufferSkipped:false,composites:{},notSureCount:{},inEditCycle:false,editCycleDone:false};
+
+  initCards();
+  document.getElementById('start-btn').textContent='Restart';
+
+  botSay('<p>'+escHtml(STAGE_OPENINGS[S.stage])+'</p>');
+
+  if(REDIRECT_STAGES.includes(S.stage)){
+    return; // warm redirect only
+  }
+
+  setTimeout(()=>askNext(),600);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CARDS INIT
+// ═══════════════════════════════════════════════════════════════
+const CARD_DEFS = [
+  {id:'c1',title:'Your Situation'},
+  {id:'c2',title:'Your One-Time Startup Costs'},
+  {id:'c3',title:'Your Monthly Operating Costs'},
+  {id:'c4',title:'Your Working Capital Reserve'},
+  {id:'c5',title:'Your Contingency Buffer'},
+  {id:'c6',title:'Your Total Launch Number'},
+  {id:'c7',title:'Your Runway Status'},
+  {id:'c8',title:'Coach Moment'},
+  {id:'c9',title:"What's Next"},
+  {id:'c10',title:'Terms in Your Startup Cost Estimate'}
+];
+
+function initCards(){
+  const container=document.getElementById('cards-container');
+  CARD_DEFS.forEach((cd,i)=>{
+    const el=document.createElement('div');
+    el.className='card';
+    el.id=cd.id;
+    el.innerHTML=`<div class="card-header"><div class="card-num">${i+1}</div>${escHtml(cd.title)}</div><div class="card-body" id="${cd.id}-body">Waiting for your answers…</div>`;
+    container.appendChild(el);
+  });
+}
+
+function populateCard(id,html){
+  const body=document.getElementById(id+'-body');
+  if(body){body.innerHTML=html;body.className='card-body populated';}
+  const card=document.getElementById(id);
+  if(card){card.classList.add('flash');setTimeout(()=>card.classList.remove('flash'),600);}
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ASK NEXT
+// ═══════════════════════════════════════════════════════════════
+function askNext(){
+  const unanswered = S.plan.filter(k=>!S.answers[k]);
+  if(unanswered.length===0){
+    if(!S.p9Answered){
+      offerP9();
+    } else {
+      renderReviewMoment();
+    }
+    return;
+  }
+  const nextKey = unanswered[0];
+  renderPrompt(PROMPTS[nextKey]);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RENDER PROMPT
+// ═══════════════════════════════════════════════════════════════
+function renderPrompt(p){
+  let q = p.q.replace(/\[businessType\]/g,S.businessType).replace(/\[geoScope\]/g,S.geoScope).replace(/\[stage\]/g,S.stage);
+  let hint = p.hint.replace(/\[businessType\]/g,S.businessType).replace(/\[geoScope\]/g,S.geoScope);
+
+  botSay(`<p>${escHtml(q)}</p><div class="hint-line">${escHtml(hint)}</div>`);
+  renderInput(p);
+}
+
+function renderInput(p){
+  clearInput();
+  const area = inputArea();
+  const wrap = document.createElement('div');
+  wrap.className='ctrl-wrap';
+
+  if(p.type==='dynlist') wrap.appendChild(renderDynList(p));
+  else if(p.type==='dropdown') wrap.appendChild(renderDropdown(p));
+  else if(p.type==='number') wrap.appendChild(renderNumber(p));
+  else if(p.type==='select') wrap.appendChild(renderSelect(p));
+
+  // Example button
+  if(p.type!=='select'){
+    const exBtn=document.createElement('button');
+    exBtn.className='example-btn';
+    exBtn.textContent='Show example';
+    const exWrap=document.createElement('div');
+    exWrap.className='example-wrap';
+    exWrap.style.display='none';
+    const examples = getExample(p.key);
+    exWrap.textContent=examples;
+    exBtn.onclick=()=>{exWrap.style.display=exWrap.style.display==='none'?'block':'none';};
+    wrap.appendChild(exBtn);
+    wrap.appendChild(exWrap);
+  }
+
+  // Not Sure button
+  if(p.key!=='P6'||true){
+    const nsBtn=document.createElement('button');
+    nsBtn.className='example-btn';
+    nsBtn.style.color=p.key==='P6'?'var(--amber)':'var(--text-light)';
+    nsBtn.style.borderColor=p.key==='P6'?'var(--amber)':'var(--text-light)';
+    nsBtn.textContent='Not sure';
+    nsBtn.onclick=()=>handleNotSure(p);
+    wrap.appendChild(document.createElement('span'));
+    wrap.lastChild.innerHTML=' ';
+    wrap.appendChild(nsBtn);
+  }
+
+  area.appendChild(wrap);
+}
+
+function getExample(key){
+  const ex={
+    P1:{Service:"Professional certifications ($500), laptop and software ($1,200), liability insurance deposit ($400).",Product:"Production equipment ($8,000), initial inventory run ($3,500), packaging design ($800).",
+        "E-Commerce":"Platform setup fees ($300), initial inventory ($4,000), photography ($600)."},
+    P2:{Service:"Home office setup ($500), business address/mailbox ($200).",Product:"First and last month rent deposit ($3,000), leasehold improvements ($2,000).","E-Commerce":"None if fully online."},
+    P3:{Service:"Entity formation (LLC): $200–$800. Attorney fees: $500–$2,000. Accountant setup: $300–$1,000.",Product:"Same as Service.",
+        "E-Commerce":"Same as Service."},
+    P4:{Service:"Software subscriptions ($150/mo), liability insurance ($100/mo), phone and internet ($120/mo).",
+        Product:"Storage/warehouse rent ($800/mo), insurance ($200/mo).",
+        "E-Commerce":"Platform fees ($100/mo), storage/3PL fees ($400/mo)."},
+    P5:{Service:"Supplies and materials (3–5% of revenue), mileage or travel (2–4%).",
+        Product:"Cost of goods sold (35–50% of revenue), shipping and fulfillment (8–12%).",
+        "E-Commerce":"Platform transaction fees (3–5%), shipping (8–15%), returns allowance (2–4%)."},
+    P6:{Service:"Early months for a local service business might be $2,000 to $4,000.",
+        Product:"Early months might be $3,000 to $6,000.",
+        "E-Commerce":"Early months might be $1,500 to $3,000."},
+    P7:{Service:"A service business with quick first clients might plan for 3 months.",
+        Product:"A product business with inventory cycles might plan for 5–6 months.",
+        "E-Commerce":"3–4 months is typical for e-commerce startups."},
+    P8:{Service:"On a $25,000 estimated total, a 15% buffer adds $3,750.",
+        Product:"Same formula applies.",
+        "E-Commerce":"Same formula applies."}
+  };
+  const map=ex[key];
+  if(!map) return '';
+  return map[S.businessType]||map['Service']||'';
+}
+
+// ─── DYNLIST ───────────────────────────────────────────────────
+function renderDynList(p){
+  const container=document.createElement('div');
+  container.className='dynlist-wrap';
+  container.id='dynlist-'+p.key;
+
+  const defaults=(PREPOP[p.key]&&PREPOP[p.key][S.businessType])||[];
+  const initialRows = defaults.length>0 ? defaults : [{item:'',cost:''}];
+
+  initialRows.forEach((row,i)=>addDynRow(container,p,i+1,row.item,row.cost));
+
+  if(initialRows.length<p.cap){
+    const addBtn=document.createElement('button');
+    addBtn.className='add-row-btn';
+    addBtn.textContent='+ Add another item';
+    addBtn.onclick=()=>{
+      const rows=container.querySelectorAll('.dynlist-row');
+      if(rows.length<p.cap){addDynRow(container,p,rows.length+1,'',0);addBtn.remove();
+        if(container.querySelectorAll('.dynlist-row').length<p.cap)container.appendChild(addBtn);}
+    };
+    container.appendChild(addBtn);
+  }
+
+  const sendBtn=document.createElement('button');
+  sendBtn.className='send-btn';
+  sendBtn.textContent='Confirm';
+  sendBtn.onclick=()=>handleDynListAnswer(p,container);
+  container.appendChild(sendBtn);
+  return container;
+}
+
+function addDynRow(container,p,num,itemVal,costVal){
+  // Insert before add button if present
+  const addBtn=container.querySelector('.add-row-btn');
+  const sendBtn=container.querySelector('.send-btn');
+  const row=document.createElement('div');
+  row.className='dynlist-row';
+  row.innerHTML=`<span class="dynlist-num">${num}</span><input type="text" placeholder="Item name" value="${escHtml(String(itemVal))}"><input type="number" placeholder="$ Cost" min="0" value="${costVal||''}"><button class="remove-btn" title="Remove">×</button>`;
+  row.querySelector('.remove-btn').onclick=()=>{row.remove();renumberDynRows(container);};
+  if(addBtn) container.insertBefore(row,addBtn);
+  else if(sendBtn) container.insertBefore(row,sendBtn);
+  else container.appendChild(row);
+}
+
+function renumberDynRows(container){
+  container.querySelectorAll('.dynlist-row').forEach((r,i)=>{const n=r.querySelector('.dynlist-num');if(n)n.textContent=i+1;});
+}
+
+function handleDynListAnswer(p,container){
+  const rows=container.querySelectorAll('.dynlist-row');
+  const data=[];
+  rows.forEach(r=>{
+    const item=r.querySelectorAll('input')[0].value.trim();
+    const cost=parseFloat(r.querySelectorAll('input')[1].value)||0;
+    if(item) data.push({item,cost});
+  });
+  if(data.length<p.min){
+    botSay(`<p>Please add at least ${p.min} item${p.min>1?'s':''} to continue.</p>`);return;
+  }
+  const totalCost=data.reduce((s,r)=>s+r.cost,0);
+  const summary=data.map(r=>`${r.item}: ${fmt(r.cost)}`).join(', ');
+  userSay(summary||'(no items)');
+  S.answers[p.key]=data;
+  maybeProbe(p.key,data);
+  advance(p.key);
+}
+
+// ─── DROPDOWN ──────────────────────────────────────────────────
+function renderDropdown(p){
+  const wrap=document.createElement('div');
+  const sel=document.createElement('select');
+  sel.className='styled-select';
+  sel.innerHTML=`<option value="">Select…</option>`+p.options.map(o=>`<option value="${escHtml(o)}">${escHtml(o)}</option>`).join('');
+  wrap.appendChild(sel);
+
+  if(p.key==='P8'){
+    const pctWrap=document.createElement('div');
+    pctWrap.id='custom-pct-wrap';
+    pctWrap.style.display='none';
+    pctWrap.innerHTML='<input type="number" min="1" max="100" placeholder="Enter %" style="margin-top:6px;border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:13px;width:120px"> <span style="font-size:13px;color:var(--text-light)">%</span>';
+    wrap.appendChild(pctWrap);
+    sel.onchange=()=>{pctWrap.style.display=sel.value==='I want to use a higher percentage'?'block':'none';};
+  }
+
+  if(p.key==='P7'){
+    const customWrap=document.createElement('div');
+    customWrap.id='custom-months-wrap';
+    customWrap.style.display='none';
+    customWrap.innerHTML='<input type="number" min="1" max="24" placeholder="Months" style="margin-top:6px;border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:13px;width:120px"> <span style="font-size:13px;color:var(--text-light)">months</span>';
+    wrap.appendChild(customWrap);
+    sel.onchange=()=>{customWrap.style.display=sel.value==='I want to enter a custom number'?'block':'none';};
+  }
+
+  const sendBtn=document.createElement('button');
+  sendBtn.className='send-btn';
+  sendBtn.style.marginTop='8px';
+  sendBtn.textContent='Confirm';
+  sendBtn.onclick=()=>handleDropdownAnswer(p,sel,wrap);
+  wrap.appendChild(sendBtn);
+  return wrap;
+}
+
+function handleDropdownAnswer(p,sel,wrap){
+  let val=sel.value;
+  if(!val){botSay('<p>Please make a selection to continue.</p>');return;}
+
+  if(p.key==='P7'&&val==='I want to enter a custom number'){
+    const customInput=wrap.querySelector('#custom-months-wrap input');
+    const m=parseFloat(customInput?.value);
+    if(!m||m<1){botSay('<p>Please enter a valid number of months.</p>');return;}
+    val=m+' months (custom)';
+    if(m<3) maybeProbe('P7-custom',{months:m});
+  }
+  if(p.key==='P8'&&val==='I want to use a higher percentage'){
+    const pctInput=wrap.querySelector('#custom-pct-wrap input');
+    const pct=parseFloat(pctInput?.value);
+    if(!pct||pct<1){botSay('<p>Please enter a valid percentage.</p>');return;}
+    val='Custom '+pct+'%';
+  }
+  if(p.key==='P8'&&val==='I want to skip this'){
+    S.bufferSkipped=true;
+  }
+
+  userSay(val);
+  S.answers[p.key]=val;
+  maybeProbe(p.key,val);
+  advance(p.key);
+}
+
+// ─── NUMBER ────────────────────────────────────────────────────
+function renderNumber(p){
+  const wrap=document.createElement('div');
+  const row=document.createElement('div');
+  row.className='number-wrap';
+  row.innerHTML='<span class="number-prefix">$</span>';
+  const input=document.createElement('input');
+  input.type='number';input.min='0';input.placeholder='0';
+  input.onkeydown=e=>{if(e.key==='Enter')sendBtn.click();};
+  row.appendChild(input);
+  wrap.appendChild(row);
+  const sendBtn=document.createElement('button');
+  sendBtn.className='send-btn';
+  sendBtn.style.marginTop='8px';
+  sendBtn.textContent='Confirm';
+  sendBtn.onclick=()=>handleNumberAnswer(p,input);
+  wrap.appendChild(sendBtn);
+  return wrap;
+}
+
+function handleNumberAnswer(p,input){
+  const val=parseFloat(input.value);
+  if(!val||val<=0){
+    if(p.key==='P6'){
+      const count=S.notSureCount[p.key]||0;
+      if(count<3){
+        S.notSureCount[p.key]=(count+1);
+        botSay(`<p>${p.notSure.moves[count]||p.notSure.moves[p.notSure.moves.length-1]}</p>`);
+        return;
+      } else {
+        botSay('<p>I can\'t estimate your revenue for you — that number needs to come from you. Please enter a number to continue.</p>');
+        return;
+      }
+    }
+    botSay('<p>Please enter a valid number to continue.</p>');return;
+  }
+  userSay(fmt(val));
+  S.answers[p.key]=val;
+  // P6 probe
+  const sc=SCORE[S.businessType];
+  if(p.key==='P6'&&sc&&val>sc.revenue_upper*1.5){
+    maybeProbe('P6-inflated',{val,type:S.businessType,stage:S.stage});
+  }
+  advance(p.key);
+}
+
+// ─── SELECT ────────────────────────────────────────────────────
+function renderSelect(p){
+  const wrap=document.createElement('div');
+  wrap.className='pill-row';
+  p.options.forEach(opt=>{
+    const btn=document.createElement('button');
+    btn.className='pill-btn';btn.textContent=opt;
+    btn.onclick=()=>{
+      wrap.querySelectorAll('.pill-btn').forEach(b=>b.classList.remove('selected'));
+      btn.classList.add('selected');
+      setTimeout(()=>handleSelectAnswer(p,opt),300);
+    };
+    wrap.appendChild(btn);
+  });
+  return wrap;
+}
+
+function handleSelectAnswer(p,val){
+  userSay(val);
+  S.answers[p.key]=val;
+  advance(p.key);
+}
+
+// ─── NOT SURE ──────────────────────────────────────────────────
+function handleNotSure(p){
+  const count=S.notSureCount[p.key]||0;
+  if(count<3){
+    S.notSureCount[p.key]=(count+1);
+    botSay(`<p>${p.notSure.moves[Math.min(count,p.notSure.moves.length-1)]}</p>`);
+  } else {
+    // Apply default
+    if(p.notSure.def==='benchmark'){
+      const defaults=(PREPOP[p.key]&&PREPOP[p.key][S.businessType])||[];
+      S.answers[p.key]=defaults.length>0?defaults:[{item:'Benchmark default',cost:0}];
+      userSay('Using benchmark defaults');
+      advance(p.key);
+    } else if(p.notSure.def==='zero'){
+      S.answers[p.key]=[];
+      userSay('No facility costs');
+      advance(p.key);
+    } else if(p.notSure.def==='composite'){
+      const comp=S.composites.p5VariableComposite||{items:[]};
+      S.answers[p.key]=comp.items||[];
+      userSay('Using benchmark estimate');
+      advance(p.key);
+    } else if(p.notSure.def){
+      S.answers[p.key]=p.notSure.def;
+      userSay(p.notSure.def);
+      advance(p.key);
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// COMPOSITE CALCULATIONS
+// ═══════════════════════════════════════════════════════════════
+function recalcComposites(){
+  const C=S.composites;
+  // 1. oneTimeSubtotal
+  const p1=(S.answers.P1||[]).reduce((s,r)=>s+r.cost,0);
+  const p2=(S.answers.P2||[]).reduce((s,r)=>s+r.cost,0);
+  const p3=(S.answers.P3||[]).reduce((s,r)=>s+r.cost,0);
+  C.p1Total=p1;C.p2Total=p2;C.p3Total=p3;
+  C.oneTimeSubtotal=p1+p2+p3;
+
+  // 2. p5VariableComposite (fires after P6)
+  if(S.answers.P6){
+    const sc=SCORE[S.businessType]||SCORE.Service;
+    const pct=sc.variable_pct;
+    const varAmt=Math.round(S.answers.P6*pct);
+    C.p5VariableComposite={
+      amt:varAmt,pct:pct*100,
+      items:[{item:`Variable costs (~${Math.round(pct*100)}% of revenue)`,cost:varAmt,isBenchmark:true}]
+    };
+  }
+
+  // 3. monthlyOperatingSubtotal
+  const p4Fixed=(S.answers.P4||[]).reduce((s,r)=>s+r.cost,0);
+  let p5Var=0;
+  let p5IsBenchmark=false;
+  if(S.answers.P5&&S.answers.P5.length>0){
+    p5Var=(S.answers.P5||[]).reduce((s,r)=>s+r.cost,0);
+    p5IsBenchmark=false;
+  } else if(C.p5VariableComposite){
+    p5Var=C.p5VariableComposite.amt;
+    p5IsBenchmark=true;
+  }
+  C.p4Fixed=p4Fixed;C.p5Var=p5Var;C.p5IsBenchmark=p5IsBenchmark;
+  C.monthlyOperatingSubtotal=p4Fixed+p5Var;
+
+  // 4. workingCapitalTotal
+  if(S.answers.P7){
+    const mStr=S.answers.P7;
+    let months=3;
+    if(mStr.startsWith('3'))months=3;
+    else if(mStr.startsWith('4'))months=4;
+    else if(mStr.startsWith('5'))months=5;
+    else if(mStr.startsWith('6'))months=6;
+    else{const m=parseFloat(mStr);if(m>0)months=m;}
+    C.p7Months=months;
+    C.workingCapitalTotal=Math.round(C.monthlyOperatingSubtotal*months);
+  }
+
+  // 5. bufferAndTotalLaunchNumber
+  if(S.answers.P8&&C.workingCapitalTotal!==undefined){
+    const sub=C.oneTimeSubtotal+(C.workingCapitalTotal||0);
+    let bufPct=0;
+    const p8=S.answers.P8;
+    if(p8==='Use 15% (standard)')bufPct=0.15;
+    else if(p8==='I want to skip this')bufPct=0;
+    else if(p8.startsWith('Custom ')){bufPct=parseFloat(p8.replace('Custom ','').replace('%',''))/100;}
+    C.bufferPct=bufPct;
+    C.bufferAmt=Math.round(sub*bufPct);
+    C.totalLaunchNumber=sub+C.bufferAmt;
+    if(C.monthlyOperatingSubtotal>0){
+      C.runwayMonths=Math.round((C.totalLaunchNumber/C.monthlyOperatingSubtotal)*10)/10;
+    } else {
+      C.runwayMonths=0;
+    }
+    C.runwayTier=runwayTier(C.runwayMonths);
+  }
+}
+
+function runwayTier(months){
+  if(months>=6.0)return{label:"CONSERVATIVE",bg:"#EBF9F1",border:"#2E8B57"};
+  if(months>=4.0)return{label:"SOLID",bg:"#EBF9F1",border:"#2E8B57"};
+  if(months>=3.0)return{label:"TIGHT",bg:"#FFF8E6",border:"#BF8F00"};
+  return{label:"AT RISK",bg:"#FDECEA",border:"#C0392B"};
+}
+
+// ═══════════════════════════════════════════════════════════════
+// GAP PROBES
+// ═══════════════════════════════════════════════════════════════
+function maybeProbe(key,data){
+  const sc=SCORE[S.businessType]||SCORE.Service;
+  if(key==='P1'){
+    const arr=Array.isArray(data)?data:[];
+    const hasZero=arr.some(r=>r.cost===0||r.cost==='');
+    if(arr.length<2||hasZero){
+      const first=arr[0]?.item||'that item';
+      setTimeout(()=>botSay(`<em>You mentioned ${escHtml(first)} — do you have a rough estimate for what that would cost, or would you like me to fill in a benchmark range?</em>`,'coach'),400);
+    }
+  }
+  if(key==='P2'){
+    const arr=Array.isArray(data)?data:[];
+    if(arr.length===0&&S.businessType==='Product'){
+      setTimeout(()=>botSay(`<em>Just to confirm — are you planning to work from home or online, or will you need a dedicated space? That changes this number significantly.</em>`,'coach'),400);
+    }
+  }
+  if(key==='P5'){
+    const arr=Array.isArray(data)?data:[];
+    const total=arr.reduce((s,r)=>s+r.cost,0);
+    const rev=S.answers.P6||0;
+    if(rev>0){
+      const rate=total/rev;
+      if(rate>sc.variable_pct*1.5*1.20){
+        setTimeout(()=>botSay(`<em>Your variable cost rate is coming out high relative to the SCORE benchmark of ${sc.variable_range} for ${S.businessType} businesses. That may be accurate for your situation — what is driving that difference?</em>`,'coach'),400);
+      }
+    }
+  }
+  if(key==='P7-custom'){
+    const m=data.months;
+    if(m<3){
+      setTimeout(()=>botSay(`<em>Three months is the SCORE minimum recommendation — going below that means revenue needs to arrive very close to plan. Are you confident in that timeline, or would you like to see what one more month adds?</em>`,'coach'),400);
+    }
+  }
+  if(key==='P6-inflated'){
+    setTimeout(()=>botSay(`<em>That is a strong first-month number for a ${escHtml(S.businessType)} business at ${escHtml(S.stage)}. Just want to make sure we are planning from the honest number — what is driving that projection?</em>`,'coach'),400);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ADVANCE
+// ═══════════════════════════════════════════════════════════════
+function advance(key){
+  recalcComposites();
+  clearInput();
+
+  // If P6 just answered, show P5 composite before P5
+  if(key==='P6'&&!S.answers.P5){
+    const C=S.composites;
+    const sc=SCORE[S.businessType]||SCORE.Service;
+    const varAmt=C.p5VariableComposite?.amt||0;
+    botSay(`<p><strong>Variable cost estimate ready:</strong> Based on your projected revenue of ${fmt(S.answers.P6)}, I'm estimating your variable costs at approximately <strong>~${fmt(varAmt)}/mo</strong> (${sc.variable_range} of revenue — SCORE benchmark for ${S.businessType} businesses). You can adjust this in the next step.</p>`);
+  }
+
+  // Ack + card population
+  const ackMap={
+    P1:`Got it — one-time equipment and setup costs noted.`,
+    P2:`Facility costs confirmed.`,
+    P3:`Legal and professional fees confirmed.`,
+    P4:`Monthly fixed costs confirmed.`,
+    P5:`Monthly variable costs confirmed.`,
+    P6:`Revenue projection confirmed: ${fmt(S.answers.P6)}/mo.`,
+    P7:`Working capital selection confirmed.`,
+    P8:`Contingency buffer confirmed.`
+  };
+  if(ackMap[key]) botSay(`<p>${ackMap[key]}</p>`);
+
+  updateCards(key);
+  updateAnswersTab(key);
+
+  setTimeout(()=>askNext(),500);
+}
+
+function updateCards(key){
+  const C=S.composites;
+  if(['P1','P2','P3'].includes(key)){
+    populateCard('c2',`One-Time Subtotal: <strong>${fmt(C.oneTimeSubtotal)}</strong><br><small>Equipment: ${fmt(C.p1Total)} · Facility: ${fmt(C.p2Total)} · Legal: ${fmt(C.p3Total)}</small>`);
+  }
+  if(['P4','P5'].includes(key)&&S.answers.P4&&S.answers.P5){
+    populateCard('c3',`Monthly Operating: <strong>${fmt(C.monthlyOperatingSubtotal)}/mo</strong><br><small>Fixed: ${fmt(C.p4Fixed)} · Variable: ${fmt(C.p5Var)}${C.p5IsBenchmark?' (est.)':''}</small>`);
+  }
+  if(key==='P7'&&C.workingCapitalTotal!==undefined){
+    populateCard('c4',`Working Capital: <strong>${fmt(C.workingCapitalTotal)}</strong><br><small>${fmt(C.monthlyOperatingSubtotal)}/mo × ${C.p7Months} months</small>`);
+  }
+  if(key==='P8'&&C.totalLaunchNumber!==undefined){
+    populateCard('c5',`Buffer: <strong>${fmt(C.bufferAmt)}</strong> (${Math.round((C.bufferPct||0)*100)}%)`);
+    populateCard('c6',`TOTAL LAUNCH NUMBER: <strong>${fmt(C.totalLaunchNumber)}</strong><br><small>Runway: ~${C.runwayMonths} months</small>`);
+    const t=C.runwayTier||{label:'—',bg:'#F3F4F6',border:'#D1D5DB'};
+    populateCard('c7',`<span style="background:${t.bg};border:2px solid ${t.border};border-radius:6px;padding:4px 10px;font-weight:700;font-size:13px">${t.label}</span><br><small>${C.runwayMonths} months runway</small>`);
+  }
+}
+
+function updateAnswersTab(key){
+  const list=document.getElementById('answers-list');
+  const existing=document.getElementById('ans-'+key);
+  const p=PROMPTS[key];
+  if(!p) return;
+  let valStr='';
+  const ans=S.answers[key];
+  if(Array.isArray(ans)){
+    valStr=ans.map(r=>`${r.item}: ${fmt(r.cost)}`).join(' · ')||'(none)';
+  } else {
+    valStr=String(ans);
+  }
+  const html=`<div class="answer-pid">${key} — ${p.label}</div><div class="answer-val">${escHtml(valStr)}</div>`;
+  if(existing){existing.innerHTML=html;}
+  else{
+    const el=document.createElement('div');
+    el.className='answer-item';el.id='ans-'+key;
+    el.innerHTML=html;
+    list.appendChild(el);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// P9 MODE-SWITCH
+// ═══════════════════════════════════════════════════════════════
+function offerP9(){
+  const p=PROMPTS.P9;
+  botSay(`<p>${escHtml(p.q)}</p><div class="hint-line">${escHtml(p.hint)}</div>`);
+  clearInput();
+  const area=inputArea();
+  const wrap=document.createElement('div');
+  wrap.className='pill-row';
+  p.options.forEach(opt=>{
+    const btn=document.createElement('button');
+    btn.className='pill-btn';btn.textContent=opt;
+    btn.onclick=()=>{
+      wrap.querySelectorAll('.pill-btn').forEach(b=>b.classList.remove('selected'));
+      btn.classList.add('selected');
+      setTimeout(()=>handleP9Answer(opt),300);
+    };
+    wrap.appendChild(btn);
+  });
+  area.appendChild(wrap);
+}
+
+function handleP9Answer(result){
+  userSay(result);
+  S.p9Answered=true;S.p9Result=result;
+  clearInput();
+  if(result==='Yes, let\'s go deeper'){
+    botSay('<p>Advanced cost detail is coming in a future update — for now, your estimate is built from the standard cost categories. Let\'s go with what we have.</p>');
+  }
+  setTimeout(()=>renderReviewMoment(),600);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// REVIEW MOMENT
+// ═══════════════════════════════════════════════════════════════
+function renderReviewMoment(){
+  recalcComposites();
+  const C=S.composites;
+  const chipData=[
+    {label:'Business Type',value:S.businessType},
+    {label:'Stage',value:S.stage},
+    {label:'Geographic Scope',value:S.geoScope},
+    {label:'Monthly Revenue Est.',value:fmt(S.answers.P6||0)},
+    {label:'One-Time Costs',value:fmt(C.oneTimeSubtotal||0)},
+    {label:'Monthly Operating Costs',value:fmt(C.monthlyOperatingSubtotal||0)+(C.p5IsBenchmark?' est.':'')},
+    {label:'Working Capital',value:(C.p7Months||3)+' months'},
+    {label:'Total Launch Number',value:fmt(C.totalLaunchNumber||0),editable:true}
+  ];
+
+  let chipsHtml='<div class="review-chips">';
+  chipData.forEach(c=>{
+    if(c.editable){
+      chipsHtml+=`<span class="review-chip editable-chip" data-val="${c.value}" onclick="editTLN(this)">${escHtml(c.label)}: ${escHtml(c.value)} ✎</span>`;
+    } else {
+      chipsHtml+=`<span class="review-chip">${escHtml(c.label)}: ${escHtml(c.value)}</span>`;
+    }
+  });
+  chipsHtml+='</div>';
+
+  botSay(`<p>Before I build your Startup Cost Estimate, here is what we are working with:</p>${chipsHtml}<p>Does this feel right?</p><p><em>Is there anything you want to change or add before I generate your estimate?</em></p>`);
+
+  clearInput();
+  const area=inputArea();
+  const wrap=document.createElement('div');
+  wrap.className='review-confirm-wrap';
+  const confirmBtn=document.createElement('button');
+  confirmBtn.className='confirm-btn';confirmBtn.textContent="Yes, generate my estimate";
+  confirmBtn.onclick=()=>{userSay("Yes, generate my estimate");clearInput();triggerGeneration();};
+  const editBtn=document.createElement('button');
+  editBtn.className='edit-btn';editBtn.textContent="I'd like to change something";
+  editBtn.onclick=()=>{
+    if(S.editCycleDone){botSay('<p>You have already made one edit. Let\'s proceed with generating your estimate.</p>');return;}
+    userSay("I'd like to change something");
+    botSay('<p>Which answer would you like to update? Type the prompt number (e.g. P6) or describe what you want to change.</p>');
+    clearInput();
+    renderEditInput();
+  };
+  wrap.appendChild(confirmBtn);
+  wrap.appendChild(editBtn);
+  area.appendChild(wrap);
+}
+
+function editTLN(el){
+  if(S.editCycleDone){botSay('<p>One edit cycle has already been completed. Proceeding with the current values.</p>');return;}
+  const currentVal=S.composites.totalLaunchNumber||0;
+  const newVal=prompt('Edit Total Launch Number:',Math.round(currentVal));
+  if(newVal&&!isNaN(parseFloat(newVal))){
+    S.composites.totalLaunchNumber=parseFloat(newVal);
+    S.composites.runwayMonths=Math.round((S.composites.totalLaunchNumber/(S.composites.monthlyOperatingSubtotal||1))*10)/10;
+    S.composites.runwayTier=runwayTier(S.composites.runwayMonths);
+    el.textContent='Total Launch Number: '+fmt(S.composites.totalLaunchNumber)+' ✎';
+    if(S.generated)renderDeliv();
+    S.editCycleDone=true;
+  }
+}
+
+function renderEditInput(){
+  const area=inputArea();
+  const wrap=document.createElement('div');
+  wrap.className='ctrl-wrap';
+  const row=document.createElement('div');
+  row.style.display='flex';row.style.gap='8px';
+  const inp=document.createElement('input');
+  inp.type='text';inp.placeholder='e.g. P6 or "change my revenue"';
+  inp.style='flex:1;border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;font-family:var(--font-display)';
+  const btn=document.createElement('button');
+  btn.className='send-btn';btn.textContent='Update';
+  btn.onclick=()=>{
+    const v=inp.value.trim().toUpperCase();
+    const match=v.match(/P[1-8]/);
+    if(match){
+      const key=match[0];
+      S.editCycleDone=true;
+      userSay('Updating '+key);
+      clearInput();
+      botSay(`<p>Let\'s update ${key}. Here\'s your previous answer — adjust as needed.</p>`);
+      S.answers[key]=undefined;
+      recalcComposites();
+      renderPrompt(PROMPTS[key]);
+      // After re-answering, re-render review
+      const origAskNext=window._origAskNext||askNext;
+      S._pendingReview=true;
+    } else {
+      botSay('<p>I\'m not sure which prompt to update. Please type the prompt ID (P1 through P8) or click "Yes, generate my estimate" to proceed.</p>');
+      renderReviewMoment();
+    }
+  };
+  row.appendChild(inp);row.appendChild(btn);
+  wrap.appendChild(row);
+  area.appendChild(wrap);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// GENERATION
+// ═══════════════════════════════════════════════════════════════
+function triggerGeneration(){
+  recalcComposites();
+  botSay('<p><strong>Got everything I need. Here is your Startup Cost Estimate.</strong></p>');
+  S.generated=true;
+  setTimeout(()=>{
+    switchTab('deliverable');
+    renderDeliv();
+    populateAllCards();
+    setTimeout(()=>enterCoachMode(),800);
+  },600);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DELIVERABLE RENDER
+// ═══════════════════════════════════════════════════════════════
+function renderDeliv(){
+  const C=S.composites;
+  const container=document.getElementById('deliv-content');
+  container.classList.add('deliv-flash');
+  setTimeout(()=>container.classList.remove('deliv-flash'),700);
+
+  const sc=SCORE[S.businessType]||SCORE.Service;
+
+  // ── ZONE 1 ─────────────────────────────────────────────────
+  const chipDefs=[
+    {label:'Business Type',value:S.businessType},
+    {label:'Stage',value:S.stage},
+    {label:'Geographic Scope',value:S.geoScope},
+    {label:'Monthly Revenue Est.',value:fmt(S.answers.P6||0)},
+    {label:'One-Time Costs',value:fmt(C.oneTimeSubtotal||0)},
+    {label:'Monthly Operating Costs',value:fmt(C.monthlyOperatingSubtotal||0)+(C.p5IsBenchmark?' est.':'')},
+    {label:'Working Capital',value:(C.p7Months||3)+' months'},
+    {label:'Total Launch Number',value:fmt(C.totalLaunchNumber||0),editable:true}
+  ];
+
+  let chipsHtml='<div class="chips-grid">';
+  chipDefs.forEach(c=>{
+    chipsHtml+=`<div class="chip${c.editable?' editable':''}" ${c.editable?'onclick="openChipEdit(this)" title="Click to edit"':''}>
+      <span class="chip-label">${escHtml(c.label)}</span>
+      <span class="chip-value">${escHtml(c.value)}</span>
+    </div>`;
+  });
+  chipsHtml+='</div>';
+
+  const industry=S.industry||'business';
+  const synth=`You are figuring out what it costs to launch a ${escHtml(S.businessType)} ${escHtml(industry)} business in ${escHtml(S.geoScope)}.`;
+
+  const zone1=`<div class="zone-block">
+    <span class="zone-label"><span class="zone-badge">1</span>Your Situation</span>
+    <p style="font-family:var(--font-sans);font-size:14px;margin-bottom:12px">${synth}</p>
+    ${chipsHtml}
+  </div>`;
+
+  // ── ZONE 2 ─────────────────────────────────────────────────
+  function statusCell(userAmt,benchMid,benchRange){
+    if(userAmt===0)return`<span class="status-gap">Gap</span>`;
+    if(userAmt>benchMid*1.5)return`<span class="status-review">Review</span>`;
+    return`<span class="status-on-track">On Track</span>`;
+  }
+
+  // Section 1 — One-Time
+  let s1Rows='';
+  (S.answers.P1||[]).forEach(r=>{
+    s1Rows+=`<tr><td>${escHtml(r.item)}</td><td>${fmt(r.cost)}</td><td>${sc.equipment.range}</td><td>${statusCell(r.cost,sc.equipment.mid,sc.equipment.range)}</td></tr>`;
+  });
+  (S.answers.P2||[]).forEach(r=>{
+    s1Rows+=`<tr><td>${escHtml(r.item)}</td><td>${fmt(r.cost)}</td><td>${sc.facility.range}</td><td>${statusCell(r.cost,sc.facility.mid,sc.facility.range)}</td></tr>`;
+  });
+  (S.answers.P3||[]).forEach(r=>{
+    s1Rows+=`<tr><td>${escHtml(r.item)}</td><td>${fmt(r.cost)}</td><td>${sc.legal.range}</td><td>${statusCell(r.cost,sc.legal.mid,sc.legal.range)}</td></tr>`;
+  });
+
+  const facilityNote=C.p2Total===0?`<p class="facility-zero-note">Facility costs: $0 — home-based / fully online. No facility costs included.</p>`:'';
+
+  // Section 2 — Monthly
+  let s2Rows='';
+  (S.answers.P4||[]).forEach(r=>{
+    s2Rows+=`<tr><td>${escHtml(r.item)} <small style="color:var(--text-light)">(fixed)</small></td><td>${fmt(r.cost)}/mo</td><td>${sc.fixed_monthly.range}</td><td>${statusCell(r.cost,sc.fixed_monthly.mid,sc.fixed_monthly.range)}</td></tr>`;
+  });
+  const varItems=S.answers.P5&&S.answers.P5.length>0?S.answers.P5:(C.p5VariableComposite?.items||[]);
+  varItems.forEach(r=>{
+    const isEst=!S.answers.P5||S.answers.P5.length===0;
+    s2Rows+=`<tr><td>${escHtml(r.item)} <small style="color:var(--text-light)">(variable)</small></td><td>${isEst?'~':''}${fmt(r.cost)}/mo${isEst?'<span class="est-suffix"> est.</span>':''}</td><td>${sc.variable_range} of revenue</td><td><span class="status-on-track">On Track</span></td></tr>`;
+  });
+
+  // Early Stage comparison row
+  let earlyStageRow='';
+  if(S.stage==='Early Stage'){
+    const variance=C.monthlyOperatingSubtotal>0?Math.round(((C.monthlyOperatingSubtotal-sc.fixed_monthly.mid)/sc.fixed_monthly.mid)*100):0;
+    const vClass=Math.abs(variance)>20?'status-review':'status-on-track';
+    earlyStageRow=`<tr style="background:#F0F9FF"><td colspan="2" style="font-size:11px;color:var(--text-light)">Actuals vs. SCORE benchmark comparison</td><td>${sc.fixed_monthly.range}</td><td><span class="${vClass}">${variance>0?'+':''}${variance}% variance</span></td></tr>`;
+  }
+
+  // Section 3 — Working Capital
+  const wc=C.workingCapitalTotal||0;
+  const s3Row=`<tr><td>Monthly operating costs</td><td>${fmt(C.monthlyOperatingSubtotal||0)}/mo × ${C.p7Months||3} months</td><td colspan="2"><strong>= ${fmt(wc)}</strong></td></tr>`;
+
+  // Section 4 — Buffer & Total
+  const bufPctDisplay=Math.round((C.bufferPct||0)*100);
+  const bufRow=S.bufferSkipped
+    ?`<tr><td>Contingency Buffer</td><td colspan="3"><span class="buffer-skipped-note">Buffer skipped — $0</span></td></tr>`
+    :`<tr><td>Contingency Buffer (${bufPctDisplay}%)</td><td>${fmt(C.bufferAmt||0)}</td><td colspan="2">${fmt(C.oneTimeSubtotal+wc)} × ${bufPctDisplay}%</td></tr>`;
+
+  const runwaySentence=`<div class="runway-sentence">${fmt(C.totalLaunchNumber||0)} covers approximately <strong>${C.runwayMonths||0} months</strong> of operations at your current burn rate of ${fmt(C.monthlyOperatingSubtotal||0)}/mo.</div>`;
+
+  const zone2=`<div class="zone-block">
+    <span class="zone-label"><span class="zone-badge">2</span>Startup Cost Calculator</span>
+    <div class="calc-section">
+      <div class="calc-section-title">Section 1 — One-Time Startup Costs</div>
+      ${facilityNote}
+      <table class="calc-table">
+        <thead><tr><th>Category</th><th>Your Estimate</th><th>SCORE Benchmark Range</th><th>Status</th></tr></thead>
+        <tbody>${s1Rows}
+        <tr class="subtotal-row"><td colspan="2"><strong>One-Time Subtotal</strong></td><td colspan="2" style="text-align:right"><strong>${fmt(C.oneTimeSubtotal||0)}</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="calc-section">
+      <div class="calc-section-title">Section 2 — Ongoing Monthly Operating Costs</div>
+      <table class="calc-table">
+        <thead><tr><th>Category</th><th>Monthly Cost</th><th>SCORE Benchmark</th><th>Status</th></tr></thead>
+        <tbody>${s2Rows}${earlyStageRow}
+        <tr class="subtotal-row"><td colspan="2"><strong>Monthly Subtotal</strong></td><td colspan="2" style="text-align:right"><strong>${fmt(C.monthlyOperatingSubtotal||0)}/mo${C.p5IsBenchmark?' <span class="est-suffix">est.</span>':''}</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="calc-section">
+      <div class="calc-section-title">Section 3 — Working Capital Reserve</div>
+      <table class="calc-table">
+        <thead><tr><th>Component</th><th>Calculation</th><th colspan="2">Total</th></tr></thead>
+        <tbody>${s3Row}
+        <tr class="subtotal-row"><td colspan="3"><strong>Working Capital Total</strong></td><td style="text-align:right"><strong>${fmt(wc)}</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="calc-section">
+      <div class="calc-section-title">Section 4 — Contingency Buffer &amp; Total</div>
+      <table class="calc-table">
+        <thead><tr><th>Item</th><th>Amount</th><th colspan="2">Formula</th></tr></thead>
+        <tbody>
+          ${bufRow}
+          <tr class="total-row"><td colspan="2"><strong>TOTAL LAUNCH NUMBER</strong></td><td colspan="2" style="text-align:right"><strong>${fmt(C.totalLaunchNumber||0)}</strong></td></tr>
+        </tbody>
+      </table>
+      ${runwaySentence}
+    </div>
+  </div>`;
+
+  // ── ZONE 3 ─────────────────────────────────────────────────
+  const tier=C.runwayTier||{label:'CALCULATING…',bg:'#F3F4F6',border:'#D1D5DB'};
+  const tierExplanations={
+    CONSERVATIVE:`${fmt(C.totalLaunchNumber||0)} covers ${C.runwayMonths||0} months of operations at ${fmt(C.monthlyOperatingSubtotal||0)}/mo — your runway gives you real time to build and adjust.`,
+    SOLID:`${fmt(C.totalLaunchNumber||0)} covers ${C.runwayMonths||0} months at ${fmt(C.monthlyOperatingSubtotal||0)}/mo — a healthy runway; stay focused on hitting your revenue milestones on schedule.`,
+    TIGHT:`${fmt(C.totalLaunchNumber||0)} covers ${C.runwayMonths||0} months at ${fmt(C.monthlyOperatingSubtotal||0)}/mo — your runway is tight; revenue needs to arrive close to your projection to avoid a capital gap.`,
+    "AT RISK":`${fmt(C.totalLaunchNumber||0)} covers ${C.runwayMonths||0} months at ${fmt(C.monthlyOperatingSubtotal||0)}/mo — your runway is critically short; address the funding gap before committing to launch costs.`
+  };
+  const tierExp=tierExplanations[tier.label]||'Calculating runway status…';
+
+  const zone3=`<div class="zone-block">
+    <span class="zone-label"><span class="zone-badge">3</span>Runway Status</span>
+    <div class="status-badge" style="background:${tier.bg};border-color:${tier.border}">
+      <div class="badge-tier" style="color:${tier.border}">${tier.label}</div>
+      <div class="badge-explanation">${escHtml(tierExp)}</div>
+    </div>
+  </div>`;
+
+  // ── ZONE 4 ─────────────────────────────────────────────────
+  const q1map={
+    "Just Exploring":{q:"What is the number that surprised you most — and what does that tell you about your plan?",src:"SCORE Business Plan Template for Startup Businesses"},
+    "Pre-Launch":{q:"Looking at your runway, what would you need to change if revenue took two months longer than you expected?",src:"SCORE Business Plan Template for Startup Businesses"},
+    "Early Stage":{q:"How does your actual monthly spend compare to this estimate — and where are the biggest variances?",src:"SCORE Business Plan Template for Startup Businesses"}
+  };
+  const q1=q1map[S.stage]||{q:"What is the one thing that has to happen before anything else can start — and do you have a date on it?",src:"SCORE Business Plan Template for Startup Businesses"};
+
+  // Q2 priority
+  let q2={q:'',src:''};
+  const allItems=[...(S.answers.P1||[]),...(S.answers.P2||[]),...(S.answers.P3||[]),...(S.answers.P4||[]),(S.answers.P5||[])].flat();
+  const hasReview=allItems.some(r=>r&&r.cost>sc.fixed_monthly.mid*1.5);
+  if(S.bufferSkipped){
+    q2={q:"Most founders who skip the buffer end up cutting corners on marketing or operations in month three. What would you do if you ran 20 percent over?",src:"SVB Startup Insights — Startup Costs and Expenses Plan"};
+  } else if(C.p7Months&&C.p7Months<3){
+    q2={q:`Three months is the SCORE minimum — going below that means revenue needs to arrive very close to plan. Are you confident in that timeline?`,src:"SCORE Business Plan Template for Startup Businesses"};
+  } else if(hasReview){
+    const topItem=allItems.filter(r=>r).sort((a,b)=>b.cost-a.cost)[0];
+    q2={q:`Your largest estimated cost is ${escHtml(topItem?.item||'one of your line items')} at ${fmt(topItem?.cost||0)}. What is your go / no-go rule before you commit to that spend?`,src:"SVB Startup Insights — Startup Costs and Expenses Plan"};
+  } else if(S.stage==='Pre-Launch'){
+    const topItem=[...(S.answers.P1||[]),...(S.answers.P2||[]),...(S.answers.P3||[])].filter(r=>r).sort((a,b)=>b.cost-a.cost)[0];
+    q2={q:`Your largest estimated cost is ${escHtml(topItem?.item||'one of your line items')} at ${fmt(topItem?.cost||0)}. What is your go / no-go rule before you commit to that spend?`,src:"SVB Startup Insights — Startup Costs and Expenses Plan"};
+  } else {
+    q2={q:"Your numbers are solid. The question now is sequencing — what is the one thing that has to happen before anything else can start, and do you have a date on it?",src:"SCORE Business Plan Template for Startup Businesses"};
+  }
+
+  const zone4=`<div class="zone-block">
+    <span class="zone-label"><span class="zone-badge">4</span>Coach Moment</span>
+    <div class="coach-moment-block">
+      <div class="coach-moment-q">"${escHtml(q1.q)}"</div>
+      <div class="coach-moment-src">Source: ${escHtml(q1.src)}</div>
+    </div>
+    <div class="coach-moment-block">
+      <div class="coach-moment-q">"${escHtml(q2.q)}"</div>
+      <div class="coach-moment-src">Source: ${escHtml(q2.src)}</div>
+    </div>
+  </div>`;
+
+  // ── ZONE 5 ─────────────────────────────────────────────────
+  // Actions
+  const allOneTime=[...(S.answers.P1||[]),...(S.answers.P2||[]),...(S.answers.P3||[])].filter(r=>r&&r.cost>0).sort((a,b)=>b.cost-a.cost);
+  const top3=allOneTime.slice(0,3);
+  const top3str=top3.map(r=>`${r.item} (${fmt(r.cost)})`).join(', ')||'your largest estimated costs';
+
+  const action1=`Get real quotes for ${escHtml(top3str)} — your three largest estimated costs — and update your numbers before you commit any spend.`;
+  const action2early=S.stage==='Early Stage'
+    ?`Confirm your funding source still covers your recalculated Total Launch Number of ${fmt(C.totalLaunchNumber||0)}.`
+    :`Identify your funding source and confirm it covers your Total Launch Number of ${fmt(C.totalLaunchNumber||0)} before you commit to any line item.`;
+
+  let action3='';
+  const tl=tier.label;
+  if(tl==='CONSERVATIVE'||tl==='SOLID'){
+    action3=`Open a dedicated business bank account and fund to ${fmt(C.workingCapitalTotal||0)} working capital before your first launch expense.`;
+  } else if(tl==='TIGHT'){
+    action3=`Open a dedicated business bank account and fund to ${fmt(C.workingCapitalTotal||0)} working capital before your first launch expense. Set a 30-day revenue check-in.`;
+  } else {
+    action3=`Address the funding gap before committing to launch costs — your working capital target is ${fmt(C.workingCapitalTotal||0)}.`;
+  }
+
+  // Check for Gap items
+  const gapItems=allOneTime.filter(r=>r.cost===0);
+  let action4='';
+  if(gapItems.length>0){
+    action4=`<div class="action-item"><div class="action-num">4</div><div>Add ${escHtml(gapItems[0].item)} to your estimate — SCORE benchmarks for ${escHtml(S.businessType)} businesses put this cost at ${sc.equipment.range}. It is currently missing from your Total Launch Number of ${fmt(C.totalLaunchNumber||0)}.</div></div>`;
+  }
+
+  // Terms to Know
+  let glossaryHtml='';
+  const showGlossary=(S.stage==='Just Exploring'||S.stage==='Pre-Launch');
+  if(showGlossary){
+    const runwayMonthsDisplay=C.runwayMonths||'—';
+    const burnDisplay=fmt(C.monthlyOperatingSubtotal||0);
+    const wcDisplay=fmt(C.workingCapitalTotal||0);
+    const bufDisplay=fmt(C.bufferAmt||0);
+    const bufPctDisp=Math.round((C.bufferPct||0)*100);
+    glossaryHtml=`<div class="glossary-block">
+      <div class="glossary-title">Terms to Know</div>
+      <div class="gloss-term"><strong>Startup Costs</strong> — All one-time and early-stage expenses required to get your business open and operating.</div>
+      <div class="gloss-term"><strong>Working Capital</strong> — ${wcDisplay} covering ${C.p7Months||3} months of operating expenses before revenue arrives.</div>
+      <div class="gloss-term"><strong>Burn Rate</strong> — ${burnDisplay}/mo monthly operating costs — how fast you are spending capital.</div>
+      <div class="gloss-term"><strong>Startup Runway</strong> — ${runwayMonthsDisplay} months at ${burnDisplay}/mo — how long your capital lasts at current burn rate.</div>
+      <div class="gloss-term"><strong>Contingency Buffer</strong> — ${bufDisplay} at ${bufPctDisp}% — the cushion added to cover unexpected costs.</div>
+      <div class="gloss-term"><strong>Fixed Costs</strong> — Expenses that stay the same each month regardless of revenue (e.g., insurance, software subscriptions).</div>
+      <div class="gloss-term"><strong>Variable Costs</strong> — Expenses that change with your sales volume (e.g., materials, shipping, transaction fees).</div>
+      <div class="gloss-term"><strong>Break-Even Point</strong> — The revenue level at which your income covers all operating costs — no profit, no loss.</div>
+    </div>`;
+  } else if(S.stage==='Early Stage'){
+    glossaryHtml=`<div class="glossary-block"><p style="font-size:12px;color:var(--text-light);font-style:italic">Terms to Know omitted — Early Stage. Available in earlier sections for reference.</p></div>`;
+  }
+
+  const zone5=`<div class="zone-block">
+    <span class="zone-label"><span class="zone-badge">5</span>What's Next</span>
+    <div class="zone5-grid">
+      <div>
+        <div class="zone5-col-title">In Your Business This Week</div>
+        <div class="action-item"><div class="action-num">1</div><div>${action1}</div></div>
+        <div class="action-item"><div class="action-num">2</div><div>${escHtml(action2early)}</div></div>
+        <div class="action-item"><div class="action-num">3</div><div>${escHtml(action3)}</div></div>
+        ${action4}
+      </div>
+      <div>
+        <div class="zone5-col-title">Platform Navigation</div>
+        <div class="fwd-bridge">Funding Paths — Section 3: Operating Costs is your next step. Now that you know your Total Launch Number, Section 3 will help you understand what it costs to run your business once you are open.</div>
+        ${glossaryHtml}
+      </div>
+    </div>
+  </div>`;
+
+  // ── BOUNDARIES ─────────────────────────────────────────────
+  const boundaries=`<div class="boundaries-block">
+    <p>This Startup Cost Estimate provides general information only — not legal, financial, regulatory, or professional advice. Information shown here, including cost estimates, benchmark ranges, working capital calculations, and runway projections, changes frequently and may not reflect current conditions in your market, industry, or location. We make no guarantees about the accuracy, completeness, or outcomes of any information provided. Always verify with the relevant authority and consult a qualified professional before making financial decisions.</p>
+    <p>This estimate is a directional planning tool, not a substitute for professional financial advice. The cost categories, benchmark ranges, and composite calculations shown here are based on SCORE and SVB industry data and your own inputs from this session — they have not been independently verified. Before committing capital based on this estimate — placing inventory orders, signing leases, or securing financing — get real quotes from actual vendors, and consult a qualified accountant or financial advisor for any decision that depends on precise cost figures or tax treatment. This agent does not provide tax advice, legal advice, investment advice, or specific vendor recommendations. Questions about tax treatment of startup costs route to your accountant or a qualified tax professional. Questions about business entity formation or contracts route to your attorney. Questions about investment or securities route to a licensed financial advisor. For funding options to cover your Total Launch Number, the next section in Funding Paths covers your choices in detail.</p>
+  </div>`;
+
+  container.innerHTML=`<h2 style="font-family:var(--font-display);font-size:18px;font-weight:600;color:var(--navy);margin-bottom:20px;padding-bottom:10px;border-bottom:2px solid var(--teal)">Your Startup Cost Estimate</h2>
+  ${zone1}${zone2}${zone3}${zone4}${zone5}${boundaries}`;
+
+  // Populate cards 1 and 7
+  populateCard('c1',`${escHtml(S.businessType)} ${escHtml(S.industry)} business in ${escHtml(S.geoScope)} — ${escHtml(S.stage)}`);
+  const t=C.runwayTier||{label:'—',bg:'#F3F4F6',border:'#D1D5DB'};
+  populateCard('c7',`<span style="background:${t.bg};border:2px solid ${t.border};border-radius:6px;padding:4px 10px;font-weight:700;font-size:13px;color:${t.border}">${t.label}</span> — ${C.runwayMonths} months`);
+  populateCard('c8',`"${q1.q.substring(0,60)}…"`);
+  populateCard('c9',`Forward bridge: Funding Paths — Section 3: Operating Costs`);
+  populateCard('c10',showGlossary?'8 terms included':'Omitted for this stage');
+}
+
+function openChipEdit(chip){
+  if(S.editCycleDone) return;
+  const currentVal=chip.querySelector('.chip-value').textContent;
+  const label=chip.querySelector('.chip-label').textContent;
+  const input=document.createElement('input');
+  input.className='chip-edit-input';
+  input.value=currentVal.replace(/[$,]/g,'');
+  chip.querySelector('.chip-value').replaceWith(input);
+  input.focus();
+  input.onblur=()=>{
+    const newVal=parseFloat(input.value.replace(/[^0-9.]/g,''));
+    if(!isNaN(newVal)&&newVal>0){
+      S.composites.totalLaunchNumber=newVal;
+      S.composites.runwayMonths=Math.round((newVal/(S.composites.monthlyOperatingSubtotal||1))*10)/10;
+      S.composites.runwayTier=runwayTier(S.composites.runwayMonths);
+      S.editCycleDone=true;
+      renderDeliv();
+      document.getElementById('tab-deliverable').classList.add('deliv-flash');
+      setTimeout(()=>document.getElementById('tab-deliverable').classList.remove('deliv-flash'),700);
+    } else {
+      const span=document.createElement('span');
+      span.className='chip-value';span.textContent=currentVal;
+      input.replaceWith(span);
+    }
+  };
+  input.onkeydown=e=>{if(e.key==='Enter')input.blur();};
+}
+
+function populateAllCards(){
+  const C=S.composites;
+  populateCard('c2',`One-Time Subtotal: <strong>${fmt(C.oneTimeSubtotal||0)}</strong>`);
+  populateCard('c3',`Monthly Operating: <strong>${fmt(C.monthlyOperatingSubtotal||0)}/mo</strong>`);
+  populateCard('c4',`Working Capital: <strong>${fmt(C.workingCapitalTotal||0)}</strong>`);
+  populateCard('c5',`Buffer: <strong>${fmt(C.bufferAmt||0)}</strong>`);
+  populateCard('c6',`Total Launch Number: <strong>${fmt(C.totalLaunchNumber||0)}</strong>`);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// COACH MODE
+// ═══════════════════════════════════════════════════════════════
+const COACH_TOPICS=[
+  {
+    label:"Break down a line item further",
+    keywords:["break down","line item","more detail","specific cost","what's included","drill into","cost breakdown","explain this number","what does this cover"],
+    answer(S){return `Pick the line item and tell me what's making you uncertain about it — the category, the amount, or both. For most costs in your estimate, the number I've given you is the SCORE midpoint for a ${S.businessType} business at your stage. That means roughly half of businesses like yours spend more, and half spend less. The variables that move it are scale (how many units, how many clients, how many locations), timing (one-time vs. spread over months), and what you already own. If you have a quote from a specific vendor, use that — it beats a benchmark every time. If you don't have a quote yet, the benchmark is the right placeholder until you do. Which line do you want to look at?`;}
+  },
+  {
+    label:"Fixed vs. variable costs — what's the difference?",
+    keywords:["fixed costs","variable costs","difference","fixed vs variable","what's fixed","what's variable","which is which","explain fixed","explain variable","cost types"],
+    answer(S){
+      const C=S.composites;
+      return `Fixed costs are what you owe every month whether or not you make a single sale — your insurance, your software subscriptions, your storage fees. They show up on your statement regardless of revenue. Variable costs move with your activity — the more you sell, the more you spend on materials, shipping, or fulfillment. In your estimate, your fixed monthly costs are ${fmt(C.p4Fixed||0)} and your variable costs are approximately ${fmt(C.p5Var||0)} based on your projected revenue of ${fmt(S.answers.P6||0)}. The reason the distinction matters: if revenue comes in slower than you planned, your fixed costs keep arriving. Your working capital reserve is what covers those fixed costs during the gap. That's why it's calculated off your total monthly costs, not just one type.`;}
+  },
+  {
+    label:"What burn rate and runway mean in practice",
+    keywords:["burn rate","runway","what does runway mean","how long will this last","how long can I operate","what is burn rate","runway calculation","months of runway","how is runway calculated"],
+    answer(S){
+      const C=S.composites;
+      return `Burn rate is simply how much you're spending each month — your total monthly operating costs. In your case that's ${fmt(C.monthlyOperatingSubtotal||0)} per month. Runway is how long your capital lasts at that rate. Your Total Launch Number of ${fmt(C.totalLaunchNumber||0)} divided by your monthly burn gives you ${C.runwayMonths||0} months. What that number actually tells you is how much time you have before revenue needs to be covering your costs — not just contributing to them, but fully covering them. The ${C.runwayTier?.label||'—'} status on your estimate reflects where that lands relative to what most founders in your situation plan for. If your runway is tighter than you'd like, the two levers are reducing monthly burn or increasing the capital you start with.`;}
+  },
+  {
+    label:"How my numbers compare to similar businesses",
+    keywords:["compare","benchmark","industry average","similar businesses","how do I compare","am I normal","am I high","SCORE benchmark","industry data","typical for my type"],
+    answer(S){return `The SCORE benchmark ranges in your estimate show you exactly where each category lands relative to what similar businesses typically spend. On Track means you're within the typical range for a ${S.businessType} business at your stage. Review means you're above the upper end of the benchmark — not necessarily wrong, but worth understanding why. Gap means the category is missing from your estimate and benchmarks suggest it's usually required for your business type. Benchmarks are a starting point, not a ceiling.`;}
+  },
+  {
+    label:"How to reduce costs in a specific category",
+    keywords:["reduce costs","cut costs","lower costs","too expensive","cost too high","save money","cheaper option","reduce spending","trim the budget","cost reduction"],
+    answer(S){return `The categories where founders have the most room to move costs without affecting launch quality are usually facility, legal setup, and marketing. Facility: if you can start from home or a shared space, do it — committing to a lease before you have revenue is the most common way to shrink runway fast. Legal setup: entity formation and basic contracts don't require a full-service firm at launch; many founders use a legal platform for formation and save attorney time for contracts that actually need review. Marketing: starting with owned and earned channels before paid ones keeps your variable costs low while you're still finding your first customers. Tell me which category you're looking at and I'll give you a more specific take based on your numbers.`;}
+  },
+  {
+    label:"Funding options to cover my launch number",
+    keywords:["funding","how to fund","cover my costs","where does the money come from","funding options","how to raise","loan","investor","savings","grants","funding my launch","pay for this"],
+    answer(S){
+      const C=S.composites;
+      return `Your Total Launch Number of ${fmt(C.totalLaunchNumber||0)} is the figure you need to have covered before you open — whether that's personal savings, a loan, an investor, a grant, or some combination. The next section in Funding Paths — Operating Costs and then Funding Your Business — walks through each of those options in detail, matched to your stage and business type. The funding section will help you figure out which path fits. Want to finish here first and head there next, or do you have a specific funding question I can help with now?`;}
+  }
+];
+
+const OUT_OF_SCOPE=[
+  {patterns:["tax","taxes","deduct","write off","write-off","irs","tax treatment"],category:"tax",professional:"a qualified tax professional"},
+  {patterns:["legal","attorney","lawyer","contract","incorporate","entity","llc","corporation","liability"],category:"legal advice",professional:"your attorney"},
+  {patterns:["invest","securities","stocks","equity","raise money from investors","venture capital","vc ","angel investor"],category:"investment or securities",professional:"a licensed financial advisor"},
+  {patterns:["recommend a vendor","specific vendor","which vendor","which software","which tool","which bank","which lender"],category:"specific vendor recommendations",professional:"industry peers or review platforms"}
+];
+
+function enterCoachMode(){
+  botSay(`<p><strong>Coach Mode is open.</strong> What would you like to explore?</p>`);
+  clearInput();
+  renderCoachControls();
+}
+
+function renderCoachControls(){
+  const area=inputArea();
+  const wrap=document.createElement('div');
+  wrap.className='coach-mode-wrap';
+  const grid=document.createElement('div');
+  grid.className='coach-topics-grid';
+  COACH_TOPICS.forEach((t,i)=>{
+    const btn=document.createElement('button');
+    btn.className='coach-topic-btn';
+    btn.textContent=t.label;
+    btn.onclick=()=>handleCoachTopic(i);
+    grid.appendChild(btn);
+  });
+  wrap.appendChild(grid);
+  const freeRow=document.createElement('div');
+  freeRow.className='coach-free-wrap';
+  const inp=document.createElement('input');
+  inp.type='text';inp.placeholder='Ask anything about your startup costs…';
+  inp.onkeydown=e=>{if(e.key==='Enter')handleCoachFreeText(inp.value);};
+  const btn=document.createElement('button');
+  btn.textContent='Send';
+  btn.onclick=()=>{handleCoachFreeText(inp.value);inp.value='';};
+  freeRow.appendChild(inp);freeRow.appendChild(btn);
+  wrap.appendChild(freeRow);
+  area.appendChild(wrap);
+}
+
+function handleCoachTopic(idx){
+  const t=COACH_TOPICS[idx];
+  userSay(t.label);
+  const answer=t.answer(S);
+  botSay(`<p>${escHtml(answer)}</p><span class="authored-tag">authored answer</span>`,'coach');
+}
+
+function handleCoachFreeText(query){
+  if(!query.trim()) return;
+  userSay(query);
+  const q=query.toLowerCase();
+
+  // Out of scope check first
+  for(const rule of OUT_OF_SCOPE){
+    if(rule.patterns.some(p=>q.includes(p))){
+      botSay(`<p>That is outside what I can help with here — ${rule.category} questions are best handled by ${rule.professional}. What I can help with is understanding your startup costs, calculating your runway, and exploring your cost categories in more detail.</p>`,'default');
+      return;
+    }
+  }
+
+  // Score topics
+  let bestIdx=0,bestScore=0;
+  COACH_TOPICS.forEach((t,i)=>{
+    let score=0;
+    t.keywords.forEach(kw=>{if(q.includes(kw.toLowerCase()))score++;});
+    if(score>bestScore){bestScore=score;bestIdx=i;}
+  });
+
+  if(bestScore>0){
+    handleCoachTopic(bestIdx);
+  } else {
+    const C=S.composites;
+    botSay(`<p>I didn't catch a specific topic in that question, but I'm here to help with your startup costs. You're a ${escHtml(S.stage)} ${escHtml(S.businessType)} business with a Total Launch Number of ${fmt(C.totalLaunchNumber||0)} and ${C.runwayMonths||0} months of runway. What would you like to explore — a specific line item, your burn rate, or how to cover your launch number?</p>`,'default');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TAB SWITCHING
+// ═══════════════════════════════════════════════════════════════
+function switchTab(tab){
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>{
+    const tabs=['answers','stages','deliverable'];
+    b.classList.toggle('active',tabs[i]===tab);
+  });
+  document.querySelectorAll('.tab-content').forEach(c=>{
+    c.classList.remove('active');
+  });
+  document.getElementById('tab-'+tab).classList.add('active');
+}
+
+// Boot
+document.addEventListener('DOMContentLoaded',()=>{
+  botSay('<p>Welcome to the Startup Costs Estimator. Select your business stage, type, and geographic scope above, then click <strong>Start Session</strong> to begin.</p>');
+});
+</script>
+</body>
+</html>
